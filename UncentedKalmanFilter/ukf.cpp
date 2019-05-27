@@ -117,3 +117,136 @@ void UKF::AugmentedSigmaPoints(MatrixXd *Xsig_out){
     *Xsig_out = Xsig_aug;
     
 }
+void UKF::SigmaPointPrediction(MatrixXd *Xsig_out){
+    
+    // set the state dimension
+     int n_x = 5;
+    // set augmented dimension
+    int n_aug = 7;
+    
+    // create a sigma point matrix
+    MatrixXd Xsig_aug=MatrixXd(n_aug,2*n_aug+1);
+    Xsig_aug <<
+    5.7441,  5.85768,   5.7441,   5.7441,   5.7441,   5.7441,   5.7441,   5.7441,   5.63052,   5.7441,   5.7441,   5.7441,   5.7441,   5.7441,   5.7441,
+    1.38,  1.34566,  1.52806,     1.38,     1.38,     1.38,     1.38,     1.38,   1.41434,  1.23194,     1.38,     1.38,     1.38,     1.38,     1.38,
+    2.2049,  2.28414,  2.24557,  2.29582,   2.2049,   2.2049,   2.2049,   2.2049,   2.12566,  2.16423,  2.11398,   2.2049,   2.2049,   2.2049,   2.2049,
+    0.5015,  0.44339, 0.631886, 0.516923, 0.595227,   0.5015,   0.5015,   0.5015,   0.55961, 0.371114, 0.486077, 0.407773,   0.5015,   0.5015,   0.5015,
+    0.3528, 0.299973, 0.462123, 0.376339,  0.48417, 0.418721,   0.3528,   0.3528,  0.405627, 0.243477, 0.329261,  0.22143, 0.286879,   0.3528,   0.3528,
+    0,        0,        0,        0,        0,        0,  0.34641,        0,         0,        0,        0,        0,        0, -0.34641,        0,
+    0,        0,        0,        0,        0,        0,        0,  0.34641,         0,        0,        0,        0,        0,        0, -0.34641;
+
+    
+    
+    
+    // create matrix with predicted sigma points as columns
+    MatrixXd Xsig_pred = MatrixXd(n_x,2*n_aug+1);
+    double delta_t = 0.1; // time diff in sec
+    
+    // Predict the sigma point
+    
+    for (int i=0; i<2*n_aug+1; ++i) {
+        // Extract the value
+        
+        double p_x= Xsig_aug(0,i);
+        double p_y=Xsig_aug(1,i);
+        double v = Xsig_aug(2,i);
+        double yaw = Xsig_aug(3,i);
+        double yawd = Xsig_aug(4,i);
+        double nu_a = Xsig_aug(5,i);
+        double nu_yawdd = Xsig_aug(6,i);
+        
+        // predict the state value
+        double px_p,py_p;
+        
+        // avoid the division by zero
+        if (fabs(yawd)>0.001) {
+            px_p = p_x+v/yawd*(sin(yaw+yawd*delta_t)-sin(yaw));
+            py_p = p_y+v/yawd*(cos(yaw)-cos(yaw+yawd*delta_t));
+            
+        }else {
+            px_p = p_x + v*delta_t*cos(yaw);
+            py_p = p_y + v*delta_t*sin(yaw);
+        }
+        
+        double v_p = v;
+        double yaw_p=yaw+yawd*delta_t;
+        double yawd_p = yawd;
+        
+        // add noise
+        px_p = px_p + 0.5*nu_a*delta_t*delta_t * cos(yaw);
+        py_p = py_p + 0.5*nu_a*delta_t*delta_t * sin(yaw);
+        v_p = v_p + nu_a*delta_t;
+        
+        yaw_p = yaw_p + 0.5*nu_yawdd*delta_t*delta_t;
+        yawd_p = yawd_p + nu_yawdd*delta_t;
+        
+        // write predicted sigma point into right column
+        Xsig_pred(0,i) = px_p;
+        Xsig_pred(1,i) = py_p;
+        Xsig_pred(2,i) = v_p;
+        Xsig_pred(3,i) = yaw_p;
+        Xsig_pred(4,i) = yawd_p;
+    }
+     *Xsig_out = Xsig_pred;
+}
+void UKF::PredictMeanAndCovariance(VectorXd *x_out
+                                   , MatrixXd *P_out){
+    // set state dimension
+    int n_x = 5;
+    
+    // set augmented dimension
+    int n_aug = 7;
+    
+    // define spreading parameter
+    double lambda = 3 - n_aug;
+    
+    // create example matrix with predicted sigma points
+    MatrixXd Xsig_pred = MatrixXd(n_x, 2 * n_aug + 1);
+    Xsig_pred <<
+    5.9374,  6.0640,   5.925,  5.9436,  5.9266,  5.9374,  5.9389,  5.9374,  5.8106,  5.9457,  5.9310,  5.9465,  5.9374,  5.9359,  5.93744,
+    1.48,  1.4436,   1.660,  1.4934,  1.5036,    1.48,  1.4868,    1.48,  1.5271,  1.3104,  1.4787,  1.4674,    1.48,  1.4851,    1.486,
+    2.204,  2.2841,  2.2455,  2.2958,   2.204,   2.204,  2.2395,   2.204,  2.1256,  2.1642,  2.1139,   2.204,   2.204,  2.1702,   2.2049,
+    0.5367, 0.47338, 0.67809, 0.55455, 0.64364, 0.54337,  0.5367, 0.53851, 0.60017, 0.39546, 0.51900, 0.42991, 0.530188,  0.5367, 0.535048,
+    0.352, 0.29997, 0.46212, 0.37633,  0.4841, 0.41872,   0.352, 0.38744, 0.40562, 0.24347, 0.32926,  0.2214, 0.28687,   0.352, 0.318159;
+    
+    // create vector for weights
+    VectorXd weights = VectorXd(2*n_aug+1);
+    
+    // create vector for predicted state
+    VectorXd x = VectorXd(n_x);
+    
+    // create covariance matrix for prediction
+    MatrixXd P = MatrixXd(n_x, n_x);
+    
+    weights[0]=lambda/lambda+n_x;
+    for (int i=1; i<2*n_aug+1; ++i) {
+        weights[i]=0.5*(1/(lambda+n_aug));
+    }
+    
+    // predicted mean
+    x.fill(0.0);
+    for (int i=0; i<2*n_aug+1; ++i) {
+        x=x+weights(i)*Xsig_pred.col(i);
+    }
+     // predicted state covariance matrix
+    
+    P.fill(0.0);
+    for (int i=0; i<2*n_aug+1; ++i) {
+        VectorXd x_diff = Xsig_pred.col(i)-x;
+        //normalize the angle
+        while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
+        while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+        
+        P=P+weights(i)*x_diff*x_diff.transpose();
+    }
+    
+    // print result
+    std::cout << "Predicted state" << std::endl;
+    std::cout << x << std::endl;
+    std::cout << "Predicted covariance matrix" << std::endl;
+    std::cout << P << std::endl;
+    
+    // write result
+    *x_out = x;
+    *P_out = P;
+}
