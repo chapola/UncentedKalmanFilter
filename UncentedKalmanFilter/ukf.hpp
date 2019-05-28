@@ -38,7 +38,9 @@ public:
     void AugmentedSigmaPoints(MatrixXd* Xsig_out);
     void SigmaPointPrediction(MatrixXd* Xsig_out);
     void PredictMeanAndCovariance(VectorXd* x_pred,MatrixXd* P_pred);
-    
+    void PredictRadarMeasurement(VectorXd* z_out,MatrixXd* S_out);
+    void UpdateState(Eigen::VectorXd* x_out,
+                     Eigen::MatrixXd* P_out);
 };
 
 #endif /* ukf_hpp */
